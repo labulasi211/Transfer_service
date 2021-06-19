@@ -9,7 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include<signal.h>
+#include <signal.h>
+#include <sys/stat.h>
 
 // 自己编写的头文件
 #include <callback/callback_func.h>
@@ -19,6 +20,18 @@
 // 定义了TCP客户端和服务端使用的端口号
 #define SERVICE_PORT 80
 #define CLIENT_PORT 81
+
+// 定义Android和Web端的url和IP地址,以及端口号
+char *web_url = "";
+char *web_ip = "";
+int web_port = 80;
+char *android_url = "";
+char *android_ip = "";
+int android_port = 80;
+
+// 面向web端的套接字和面向android端的套接字
+int web_socket = 0;
+int android_socket = 0;
 
 // 定义两个线程之间的通信方式为消息队列
 // 原因在于消息队列可以很好的对复杂的数据类型进行传输
@@ -39,7 +52,8 @@ int creat_service_thread(void);
 int cancel_service_thread(void);
 // 退出处理函数
 void exit_handle(int signo);
-
+// 数据初始化
+int data_init(void);
 
 /**退出处理函数
  * @brief 主要是对异常退出时的一些收尾工作
@@ -47,8 +61,50 @@ void exit_handle(int signo);
  * */
 void exit_handle(int signo)
 {
-   printf("exit!\r\nsigno:%d\r\n",signo);
-   exit(0); 
+    // 关闭套接字
+    shutdown(web_socket,2);
+    shutdown(android_socket,2);
+
+    // 关闭消息队列
+    msgctl(web_arg.database.msg_id,IPC_RMID,0);
+
+    printf("exit!\r\nsigno:%d\r\n", signo);
+    exit(0);
+}
+
+/**初始化传递给线程的数据函数
+ * @brief 对传递给线程的参数进行初始化,其中就包括消息队列的初始化和
+ *        和一些socket的参数的初始化.
+ * @param[out] 输出参数初始化状态
+ * */
+int data_init(void)
+{
+    // 初始化需要传递的参数
+    web_arg.database.msg_id = init_msg(key_t(MSG_KEY));
+    web_arg.database.using_port = CLIENT_PORT;
+    strcpy(web_arg.database.url, web_url);
+    strcpy(web_arg.database.ip, web_ip);
+    web_arg.database.remote_port = web_port;
+    web_arg.database.socket_point = &web_socket;
+
+    android_arg.database.msg_id = web_arg.database.msg_id;
+    android_arg.database.using_port = SERVICE_PORT;
+    strcpy(android_arg.database.url, android_url);
+    strcpy(android_arg.database.ip, android_ip);
+    android_arg.database.remote_port = android_port;
+    android_arg.database.socket_point = &android_socket;
+
+    // 回调函数
+    web_arg.callback = web_callback_func;
+    android_arg.callback = android_callback_func;
+
+    // 判断消息队列是否创建成功
+    if (web_arg.database.msg_id == -1)
+    {
+        printf("MSG ERROR!\r\n");
+        return -1;
+    }
+    return 0;
 }
 
 /**初始化并创建面向web和android的两个线程函数
@@ -60,17 +116,9 @@ int creat_service_thread(void)
     // 返回结果
     int ret = -1;
 
-    // 初始化需要传递的参数
-    web_arg.msg_id = init_msg(key_t(MSG_KEY));
-    android_arg.msg_id = web_arg.msg_id;
-    // 回调函数
-    web_arg.callback = web_callback_func;
-    android_arg.callback = android_callback_func;
-
-    // 判断消息队列是否创建成功
-    if(web_arg.msg_id==-1)
+    // 初始化传递参数数据
+    if (-1 == data_init())
     {
-        printf("MSG ERROR!\r\n");
         return ret;
     }
 
@@ -80,6 +128,7 @@ int creat_service_thread(void)
     {
         ret = pthread_create(&android_service_id, NULL, android_service, (void *)&android_arg);
     }
+
     return ret;
 }
 
@@ -89,20 +138,23 @@ int creat_service_thread(void)
  * */
 int cancel_service_thread(void)
 {
+    // 定义输出结果
+    int ret = -1;
     if (0 == deinit_thread(web_client_id))
     {
         if (0 == deinit_thread(android_service_id))
         {
-            return 0;
+            ret = 0;
         }
     }
-    return -1;
+
+    return ret;
 }
 
 int main(void)
 {
     // 对一些异常的处理
-    signal(SIGINT,exit_handle);
+    signal(SIGINT, exit_handle);
     // 初始化线程
     if (-1 == creat_service_thread())
     {

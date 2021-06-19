@@ -1,7 +1,9 @@
 #ifndef _MUSIC_MSG_H
 #define _MUSIC_MSG_H
 
-#include<sys/msg.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 
 // 定义一些字符串的限制
 #define MAX_TITLE_LEN (128)
@@ -17,14 +19,13 @@ struct __MUSIC_INFO
     char singer[MAX_SINGER_LEN];
 };
 
-
 // 声明消息队列消息结构体
 typedef struct _MUSIC_MSG
 {
     long msg_type;
     int music_num;
     struct __MUSIC_INFO *music_info_list;
-}__music_msg;
+} __music_msg;
 
 // 初始化消息队列
 int init_msg(key_t key);
