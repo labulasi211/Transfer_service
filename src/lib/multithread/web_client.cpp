@@ -22,31 +22,108 @@ int addr_init(sockaddr_in *addr_p, __data_arg *net_arg_p);
 int parse_url(sockaddr_in *addr_p, char *url);
 // 从域名中获得ip地址
 int get_ip_addr(char *domain, char *ip_addr);
+// 接收Http报文
+int http_recv(char *content);
 
 // 定义web端套接字地址
 sockaddr_in web_addr;
+
+/** 接收http报文
+ * @brief 对接收到的http报文进行解析,将文件请求提交给回调函数,但是只接收POST请求报文,其他类新的都返回400
+ * @param[in] content 指向用来储存请求字符串的地址
+ * */
+int http_recv(int web_socket, char *content)
+{
+    // 定义返回值
+    int ret = -1;
+    // 定义接收缓存区
+    char recv_buffer[RECV_BUF_SIZE] = {0};
+    // 定义请求头部和请求内容字符串缓存指针
+    char *request_header;
+    char *request_content;
+    // 初始化头部请求字符串指针头部
+    request_header = (char *)malloc(HTTP_HEADER_LEN * sizeof(char));
+    memset(request_header, 0, HTTP_HEADER_LEN);
+
+    // 定义接收到的数据长度
+    int len = 0;
+    // 定义总长度,用于记录个部分的总长度
+    int total_lenght = 0;
+    // 定义当前缓存变量储存大小
+    int mem_size = 0;
+    // 定义可能需要使用到的临时缓存区指针
+    char *temp;
+
+    // 接收数据前先对需要使用到的数据初始化
+    total_lenght = 0;
+    len = 0;
+    mem_size = HTTP_HEADER_LEN;
+    memset(recv_buffer, 0, RECV_BUF_SIZE);
+
+    // 接收http报文请求头部
+    while ((len = recv(web_socket, recv_buffer, RECV_BUF_SIZE, MSG_NOSIGNAL)) > 0)
+    {
+        // 表示有接收到数据
+        if (total_lenght + len > mem_size)
+        {
+            // 当当前储存区的大小比请求头总长度小时
+            // 对储存区进行扩大
+            mem_size *= 2;
+            temp = (char *)realloc(request_header, sizeof(char) * mem_size);
+            if (temp == NULL)
+            {
+                // 当重新分配失败时,直接退出
+                printf("REALLOC ERROR!\r\n");
+                // 对使用到的堆进行释放
+                free(request_header);
+                ret = -1;
+                return ret;
+            }
+            request_header = temp;
+            temp = NULL;
+        }
+
+        // 对接收到的数据与现有的进行拼接
+        recv_buffer[len] = '\0';
+        strcat(request_header, recv_buffer);
+
+        // 判断请求头是否结束
+        if (strcmp(&request_header[strlen(request_header) - 4], "\r\n\r\n"))
+        {
+            // 说明请求头部已经结束
+            ret = 1;
+            break;
+        }
+        // 还没有结束继续
+        total_lenght += len;
+    }
+    // 初始化请求内容字符串指针头部
+    request_content = (char *)malloc(HTTP_CONTENT_LEN * sizeof(char));
+    memset(request_content, 0, HTTP_CONTENT_LEN);
+}
 
 /** 获取ip地址
  * @brief 通过域名得到相应的ip地址
  * @param[in] domain 指向域名变量的指针
  * @param[in] ip_addr 指向IP地址字符串字符串的指针
  * */
-int get_ip_addr(char* domain,char* ip_addr)
+int get_ip_addr(char *domain, char *ip_addr)
 {
     // 通过专门的函数来获取相应的IP地址
-    struct hostent *host=gethostbyname(domain);
+    struct hostent *host = gethostbyname(domain);
     // 判断ip地址是否成功获得
-    if(host==NULL)
+    if (host == NULL)
     {
         // 获取失败
-        memset((void*)ip_addr,0,IP_ADDR_LEN);
+        memset((void *)ip_addr, 0, IP_ADDR_LEN);
         return -1;
     }
     // 其中在struct hostent 结构体中的h_addr_list数组中储存的就是相应
     // IP地址,一个网址可能有多个IP地址,这里只用第一个IP地址
-    strcpy(ip_addr,inet_ntoa(*(struct in_addr*)host->h_addr));
+    strcpy(ip_addr, inet_ntoa(*(struct in_addr *)host->h_addr));
     return 0;
 }
+
 /** url解析函数
  * @brief 对url的解析得到web端相应的地址和端口号
  * @param[in] addr_p 指向地址变量的指针
@@ -57,7 +134,7 @@ int parse_url(sockaddr_in *addr_p, char *url)
 {
     // 通过url解析出域名和端口号,只对这两个进行解析
     // 定义返回状态值
-    int ret=-1;
+    int ret = -1;
     // 初始化一个变量,用于计数
     int amount = 0;
     // 初始化域开始位置变量,用于确定url中的域名的部分从那开始
@@ -133,6 +210,7 @@ int addr_init(sockaddr_in *addr_p, __data_arg *net_arg_p)
             // 使用默认端口号
             net_arg_p->remote_port = CONNECT_PORT;
         }
+        // 通过用户自己设定的参数进行赋值
         addr_p->sin_port = htons(net_arg_p->remote_port);
         addr_p->sin_addr.s_addr = inet_addr(net_arg_p->ip);
         // 判断其中是否是有效的
@@ -173,6 +251,15 @@ int client_connect(__data_arg *net_arg_p)
         printf("ADDR INITIALIZATION ERROR!\r\n");
         return -1;
     }
+
+    // 完成连接
+    puts("connect...");
+    if (*net_arg_p->socket_point = connect(*(net_arg_p->socket_point), (sockaddr *)&web_addr, sizeof(web_addr)) == SOCKET_ERROR)
+    {
+        return -1;
+    }
+
+    return 0;
 }
 
 /**面向web的客户端函数
@@ -184,11 +271,40 @@ void *web_client(void *arg)
 {
     // 格式化输入参数格式
     __service_thread_arg thread_arg = *(__service_thread_arg *)arg;
+    // 定义请求字符串缓存变量,用于保存请求字符串
+    char *request_data = NULL;
 
-    // 向web端进行连接
-    int socket;
+    // 对请求字符串进行初始化
+    request_data = (char *)malloc(HTTP_CONTENT_LEN * sizeof(char));
+    memset(request_data, 0, HTTP_CONTENT_LEN);
 
+    // 通过网络参数进行连接
+    if (-1 == client_connect(&thread_arg.database))
+    {
+        // 连接失败
+        printf("CONNECT ERROR!\r\n");
+        exit(1);
+    }
+
+    // 连接成功
+    puts("CONNECT SUCCESSFUL!\r\n");
+
+    // 轮循对web端接口进行接收数据,对数据内容进行解析,解析得到相应需要的内容之后提交给回调函数
     while (1)
     {
+        // 对web端接口进行http报文接收
+        if (0 == http_recv(*thread_arg.database.socket_point, request_data))
+        {
+            // 执行回调函数
+            thread_arg.callback(request_data, thread_arg.database);
+        }
+        else
+        {
+            // 说明发送过来的数据不符合要求或则没有接收到数据
+            sleep(1);
+        }
     }
+
+    // 程序退出
+    exit(0);
 }

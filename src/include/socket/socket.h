@@ -33,5 +33,7 @@
 #define DOMAIN_LEN (64)
 // 定义http请求报文字符串长度
 #define HTTP_HEADER_LEN (2048)
+// 定义http内容部分接收字符串长度
+#define HTTP_CONTENT_LEN (2048)
 
 #endif
