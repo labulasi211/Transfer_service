@@ -36,4 +36,18 @@
 // 定义http内容部分接收字符串长度
 #define HTTP_CONTENT_LEN (2048)
 
+
+// 定义http响应状态码
+#define OK (200)
+#define BAD_REQUEST (400)
+
+// 定义http报文头部字段名数据类型
+typedef struct __HTTP_REQUEST_TITLE
+{
+    // 需要使用到的请求头部字段数据
+    int Host[MAX_URL_LEN];
+    int Content_Type;
+    int Content_length;
+}__http_request_title;
+
 #endif

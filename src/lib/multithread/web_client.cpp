@@ -23,24 +23,33 @@ int parse_url(sockaddr_in *addr_p, char *url);
 // 从域名中获得ip地址
 int get_ip_addr(char *domain, char *ip_addr);
 // 接收Http报文
-int http_recv(char *content);
+int http_recv(char **content);
+// 对http请求报文头部的接收
+int http_header_recv(int web_socket, char **header);
+// http请求头部的分解
+int parse_http_request(char *header, __http_request_title *title);
+// 对http请求报文内容的接收
+int http_content_recv(int web_socket, char **content, __http_request_title title);
+// 对http请求报文的响应
+int http_response(int web_socket, int http_response_mun);
 
 // 定义web端套接字地址
 sockaddr_in web_addr;
 
-/** 接收http报文
- * @brief 对接收到的http报文进行解析,将文件请求提交给回调函数,但是只接收POST请求报文,其他类新的都返回400
- * @param[in] content 指向用来储存请求字符串的地址
+/** 接收http请求报文头部
+ * @brief 接收http请求报文头部,将头部提交给调用的函数
+ * @param[in] header http请求报文头部字符串指针的指针,主要是用于字符串的保留
+ * @param[out] int 返回接收状态
  * */
-int http_recv(int web_socket, char *content)
+int http_header_recv(int web_socket, char **header)
 {
-    // 定义返回值
+    // 定义函数返回结果
     int ret = -1;
     // 定义接收缓存区
     char recv_buffer[RECV_BUF_SIZE] = {0};
-    // 定义请求头部和请求内容字符串缓存指针
+    // 定义头部请求字符串指针头部
     char *request_header;
-    char *request_content;
+
     // 初始化头部请求字符串指针头部
     request_header = (char *)malloc(HTTP_HEADER_LEN * sizeof(char));
     memset(request_header, 0, HTTP_HEADER_LEN);
@@ -74,10 +83,8 @@ int http_recv(int web_socket, char *content)
             {
                 // 当重新分配失败时,直接退出
                 printf("REALLOC ERROR!\r\n");
-                // 对使用到的堆进行释放
-                free(request_header);
                 ret = -1;
-                return ret;
+                break;
             }
             request_header = temp;
             temp = NULL;
@@ -91,15 +98,82 @@ int http_recv(int web_socket, char *content)
         if (strcmp(&request_header[strlen(request_header) - 4], "\r\n\r\n"))
         {
             // 说明请求头部已经结束
-            ret = 1;
-            break;
+            ret = 0;
+            *header = request_header;
+            return ret;
         }
         // 还没有结束继续
         total_lenght += len;
     }
-    // 初始化请求内容字符串指针头部
-    request_content = (char *)malloc(HTTP_CONTENT_LEN * sizeof(char));
-    memset(request_content, 0, HTTP_CONTENT_LEN);
+    // 对使用到的堆进行释放
+    free(request_header);
+    return ret;
+}
+
+/** 接收http报文
+ * @brief 对接收到的http报文进行解析,将文件请求提交给回调函数,但是只接收POST请求报文,其他类新的都返回400
+ * @param[in] content 指向用来储存请求字符串的地址
+ * */
+int http_recv(int web_socket, char **content)
+{
+    // 定义函数返回值
+    int ret = -1;
+    // 定义http相应返回值  Bad Request
+    int http_response_mun = 400;
+    // 定义请求头部和请求内容字符串缓存指针
+    char *request_header;
+    char *request_content;
+    // 定义解析http请求头部字段变量
+    __http_request_title title;
+
+    // 对title进行初始化
+    title.Content_length = title.Content_Type = 0;
+    memset(title.Host, 0, sizeof(title.Host));
+
+    // 对http请求头部进行接收
+    ret = http_header_recv(web_socket, &request_header);
+
+    // 对http头部进行分析
+    if (ret == 0)
+    {
+        // 表示前面http报文头部接收成功
+        // 对接收的http报文请求头部进行分析
+        http_response_mun = parse_http_request(request_header, &title);
+    }
+    else
+    {
+        // 表示没有接收到消息,直接返回
+        return ret;
+    }
+
+    if (http_response_mun == OK)
+    {
+        // 当上面的头部接收和分析都没有问题,就进行对请求内容进行接收
+        ret = http_content_recv(web_socket, &request_content, title);
+    }
+    else
+    {
+        // 表示http请求不符合要求,不对内容进行接收
+    }
+
+    // 对接收的状态进行判断
+    if (ret == 0)
+    {
+        // 接收成功
+        // 将得到的http请求内容地址传递回去
+        *content = request_content;
+    }
+    else
+    {
+        // 表示接收http请求内容时出错了,作出相应的响应
+        if(-1==http_response(web_socket,http_response_mun))
+        {
+            // 表示发送响应错误
+            printf("HTTP RESPONSE ERROR!\r\n");
+        }
+    }
+
+    return ret;
 }
 
 /** 获取ip地址
@@ -273,10 +347,8 @@ void *web_client(void *arg)
     __service_thread_arg thread_arg = *(__service_thread_arg *)arg;
     // 定义请求字符串缓存变量,用于保存请求字符串
     char *request_data = NULL;
-
-    // 对请求字符串进行初始化
-    request_data = (char *)malloc(HTTP_CONTENT_LEN * sizeof(char));
-    memset(request_data, 0, HTTP_CONTENT_LEN);
+    // 定义http报文响应状态码
+    int http_response_mun=400;
 
     // 通过网络参数进行连接
     if (-1 == client_connect(&thread_arg.database))
@@ -293,10 +365,13 @@ void *web_client(void *arg)
     while (1)
     {
         // 对web端接口进行http报文接收
-        if (0 == http_recv(*thread_arg.database.socket_point, request_data))
+        if (0 == http_recv(*thread_arg.database.socket_point, &request_data))
         {
-            // 执行回调函数
-            thread_arg.callback(request_data, thread_arg.database);
+            // 表示http请求报文内容接收成功
+            // 调用回调函数来对内容进行处理
+            http_response_mun=thread_arg.callback(request_data, thread_arg.database);
+            // 根据状态码进行http报文响应
+
         }
         else
         {

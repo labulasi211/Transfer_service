@@ -29,7 +29,7 @@ typedef struct __SERVICE_THREAD_ARG
     // 需要传递的数据参数
     __data_arg database;
     // 回调函数指针,其中第一个函数是接受到的数据,第二个是相应线程传递的参数
-    void (*callback)(void *str, __data_arg arg);
+    int (*callback)(void *str, __data_arg arg);
 } __service_thread_arg;
 
 // 多线程函数声明
