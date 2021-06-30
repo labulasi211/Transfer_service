@@ -23,7 +23,7 @@ void *android_service(void *arg)
     while (1)
     {
         // 接收消息队列中的消息
-        if (msgrcv(thread_arg.msg_id, (void *)&music_msg, sizeof(music_msg), 1, 0) > 0)
+        if (msgrcv(thread_arg.database.msg_id, (void *)&music_msg, sizeof(music_msg), 1, 0) > 0)
         {
             printf("recv:\r\n");
             for (int i = 0; i < music_msg.music_num; i++)
@@ -31,7 +31,7 @@ void *android_service(void *arg)
                 printf("id:%d\r\nmusic_name:%s\r\nmusic_intro:%s\r\n"\
                 , music_msg.music_info_list[i].id, music_msg.music_info_list[i].title\
                 , music_msg.music_info_list[i].intro);
-                thread_arg.callback((void*)music_msg.music_info_list[i].singer,thread_arg.msg_id);
+                thread_arg.callback((void*)music_msg.music_info_list[i].singer,thread_arg.database);
             }
         }
         else

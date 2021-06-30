@@ -17,9 +17,10 @@
  * @param[in] arg 调用回调函数需要的参数
  * @param[in] str 调用该函数的日志信息
  * */
-void android_callback_func(void* str,int arg)
+int android_callback_func(void* str,__data_arg arg)
 {
     printf("singer:%s\r\n\r\n",(char*)str);
+    return OK;
 }
 
 /**web回调函数
@@ -27,7 +28,8 @@ void android_callback_func(void* str,int arg)
  * @param[in] arg 调用回调函数需要的参数
  * @param[in] str 调用该函数的日志信息
  * */
-void web_callback_func(void*str, int arg)
+int web_callback_func(void*str, __data_arg arg)
 {
     printf("%s\r\n\r\n",(char*)str);
+    return OK;
 }

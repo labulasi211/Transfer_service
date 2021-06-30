@@ -22,11 +22,11 @@
 #define CLIENT_PORT 81
 
 // 定义Android和Web端的url和IP地址,以及端口号
-char *web_url = "";
-char *web_ip = "";
+const char *web_url = "";
+const char *web_ip = "";
 int web_port = 80;
-char *android_url = "";
-char *android_ip = "";
+const char *android_url = "";
+const char *android_ip = "";
 int android_port = 80;
 
 // 面向web端的套接字和面向android端的套接字
@@ -81,18 +81,18 @@ int data_init(void)
 {
     // 初始化需要传递的参数
     web_arg.database.msg_id = init_msg(key_t(MSG_KEY));
-    web_arg.database.using_port = CLIENT_PORT;
-    strcpy(web_arg.database.url, web_url);
-    strcpy(web_arg.database.ip, web_ip);
-    web_arg.database.remote_port = web_port;
-    web_arg.database.socket_point = &web_socket;
+    web_arg.database.socket_arg.using_port = CLIENT_PORT;
+    strcpy(web_arg.database.socket_arg.url, web_url);
+    strcpy(web_arg.database.socket_arg.ip, web_ip);
+    web_arg.database.socket_arg.remote_port = web_port;
+    web_arg.database.socket_arg.socket_point = &web_socket;
 
     android_arg.database.msg_id = web_arg.database.msg_id;
-    android_arg.database.using_port = SERVICE_PORT;
-    strcpy(android_arg.database.url, android_url);
-    strcpy(android_arg.database.ip, android_ip);
-    android_arg.database.remote_port = android_port;
-    android_arg.database.socket_point = &android_socket;
+    android_arg.database.socket_arg.using_port = SERVICE_PORT;
+    strcpy(android_arg.database.socket_arg.url, android_url);
+    strcpy(android_arg.database.socket_arg.ip, android_ip);
+    android_arg.database.socket_arg.remote_port = android_port;
+    android_arg.database.socket_arg.socket_point = &android_socket;
 
     // 回调函数
     web_arg.callback = web_callback_func;

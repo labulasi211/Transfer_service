@@ -11,16 +11,7 @@ typedef struct __DATA_ARG
 {
     // 消息队列ID
     int msg_id;
-    // 需要使用到的套接字地址
-    int *socket_point;
-    // 需要使用到的端括号
-    int using_port;
-    // 定义对方的url
-    char url[MAX_URL_LEN];
-    // 定义对方的ip
-    char ip[IP_ADDR_LEN];
-    // 定义对方的port
-    int remote_port;
+    __socket_arg socket_arg;
 } __data_arg;
 
 // 定义创建线程时的传递参数

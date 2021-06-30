@@ -45,16 +45,19 @@ LIB_PATH := $(TOP_DIR)/lib
 LIB_MULTITHREAD_DIR := $(LIB_PATH)/multithread
 LIB_MESSAGE_QUEUE_DIR := $(LIB_PATH)/message_queue
 LIB_CALLBACK_DIR := $(LIB_PATH)/callback
+LIB_SOCKET_DIR := $(LIB_PATH)/socket
 #最终server所依赖的库
 LINK_LIB := $(LIB_MULTITHREAD_DIR)/libmultithread.a \
 			$(LIB_MESSAGE_QUEUE_DIR)/libmessage_queue.a \
-			$(LIB_CALLBACK_DIR)/libcallback.a
+			$(LIB_CALLBACK_DIR)/libcallback.a\
+			$(LIB_SOCKET_DIR)/libsocket.a
 
 #定义头文件路径,需要在前面加上"-I"
 INCPATH := -I$(TOP_DIR)/include
 
 #定义子Makefile文件路径,用于运行这些子Makefile
-SUB_DIR := $(LIB_MULTITHREAD_DIR) \
+SUB_DIR := $(LIB_SOCKET_DIR)\
+		   $(LIB_MULTITHREAD_DIR) \
 		   $(LIB_MESSAGE_QUEUE_DIR) \
 		   $(LIB_CALLBACK_DIR) \
 		   $(BIN_DIR)
