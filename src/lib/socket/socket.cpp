@@ -11,7 +11,7 @@
 #include <socket/socket.h>
 
 // 定义http响应代码字符串数组
-char RESPONSE_STATUS_CODE[HTTP_RESPONSE_CODE_MUN][HTTP_RESPONSE_STRING_LEN]={0};
+char RESPONSE_STATUS_CODE[HTTP_RESPONSE_CODE_MUN][HTTP_RESPONSE_STRING_LEN] = {0};
 
 /** 对http响应字符串初始化
  * @brief 对http响应字符串初始化
@@ -44,7 +44,7 @@ int http_response(int web_socket, int http_response_mun)
     // 发送
     len = send(web_socket, response, sizeof(response), MSG_DONTWAIT);
     // 判断是否发送成功
-    if (len = SOCKET_ERROR)
+    if (len == SOCKET_ERROR)
     {
         // 发送失败
         return -1;
@@ -62,7 +62,7 @@ int http_content_recv(int web_socket, char **content, __http_request_header titl
 {
     // http内容的接收
     // 定义函数返回值
-    int ret = -2;
+    int ret = BAD_REQUEST;
     // 定义接收数据长度
     int total_length;
     // 定义本次接收的数据长度
@@ -89,7 +89,7 @@ int http_content_recv(int web_socket, char **content, __http_request_header titl
     while ((len = recv(web_socket, (void *)recv_buffer, RECV_BUF_SIZE, MSG_DONTWAIT)) > 0)
     {
         // 表示有接收到数据
-        ret = 0;
+        ret = OK;
         // 接收到数据
         if (total_length + len > memsize)
         {
@@ -100,7 +100,7 @@ int http_content_recv(int web_socket, char **content, __http_request_header titl
             {
                 // 表示当前内存不够
                 printf("REALLOC ERROR!\r'n");
-                ret = -1;
+                ret = BAD_REQUEST;
                 break;
             }
             request_content = temp;
@@ -112,21 +112,23 @@ int http_content_recv(int web_socket, char **content, __http_request_header titl
     }
 
     // 对接收的数据长度与请求头部中的数据长度进行判断
-    if (ret == 0 && total_length == title.Content_length)
+    if (total_length == title.Content_length)
     {
         // 表示接收成功
         *content = request_content;
+        ret = OK;
         return ret;
     }
-    else if (ret == 0)
+    else if (ret == OK)
     {
         // 表示请求头中发生轮错误
-        ret = -1;
+        ret = BAD_REQUEST;
         printf("RECV CONTENT ERROR!\r\n");
     }
     // 表示接收时发生了错误
     free(request_content);
-    return -1;
+    ret = BAD_REQUEST;
+    return ret;
 }
 
 /** 查找字符串函数(不区分大小写)
@@ -148,6 +150,7 @@ const char *strstri(const char *str1, const char *str2)
     }
 
     // 遍历str1字符串查找str2字符串
+    str = str1;
     while (*str == '\0')
     {
         if (0 == strncasecmp(str, str2, len))
@@ -250,7 +253,7 @@ int http_header_recv(int web_socket, char **header)
     memset(recv_buffer, 0, RECV_BUF_SIZE);
 
     // 接收http报文请求头部,一次只接受一个字符串,防止将请求内容也接收
-    while ((len = recv(web_socket, recv_buffer, 1, MSG_NOSIGNAL)) > 0)
+    while ((len = recv(web_socket, recv_buffer, 1, MSG_DONTWAIT)) > 0)
     {
         // 表示有接收到数据
         if (total_lenght + len > mem_size)
@@ -263,7 +266,7 @@ int http_header_recv(int web_socket, char **header)
             {
                 // 当重新分配失败时,直接退出
                 printf("REALLOC ERROR!\r\n");
-                ret = -1;
+                ret = BAD_REQUEST;
                 break;
             }
             request_header = temp;
@@ -275,11 +278,13 @@ int http_header_recv(int web_socket, char **header)
         strcat(request_header, recv_buffer);
 
         // 判断请求头是否结束
-        if (strcmp(&request_header[strlen(request_header) - 4], "\r\n\r\n"))
+        if (0 == strcmp(&request_header[strlen(request_header) - 4], "\r\n\r\n"))
         {
             // 说明请求头部已经结束
-            ret = 0;
+            ret = OK;
             *header = request_header;
+            printf("--%s--", *header);
+            fflush(stdout);
             return ret;
         }
         // 还没有结束继续
@@ -293,11 +298,13 @@ int http_header_recv(int web_socket, char **header)
 /** 接收http报文
  * @brief 对接收到的http报文进行解析,将文件请求提交给回调函数,但是只接收POST请求报文,其他类新的都返回400
  * @param[in] content 指向用来储存请求字符串的地址
+ * @param[out] int http报文返回值
  * */
 int http_recv(int web_socket, char **content)
 {
     // 定义函数返回值
     // 以-2为初始值主要用于判断错误是否是无数据传输还是接收时出错了
+    // 返回状态响应码
     int ret = -2;
     // 定义http相应返回值  Bad Request
     int http_response_mun = BAD_REQUEST;
@@ -314,7 +321,7 @@ int http_recv(int web_socket, char **content)
     ret = http_header_recv(web_socket, &request_header);
 
     // 对http头部进行分析
-    if (ret == 0)
+    if (ret == OK)
     {
         // 表示前面http报文头部接收成功
         // 对接收的http报文请求头部进行分析
@@ -333,38 +340,18 @@ int http_recv(int web_socket, char **content)
     }
     else
     {
-        // 表示http请求不符合要求,不对内容进行接收
-        // 并将响应代码发送出去
-        if (-1 == http_response(web_socket, http_response_mun))
-        {
-            // 表示发送响应错误
-            printf("HTTP RESPONSE ERROR!\r\n");
-        }
         // 对结果返回值进行赋值
         // 表示主函数不需要在做什么
-        ret = -1;
-        return ret;
+        ret = http_response_mun;
     }
 
     // 对接收的状态进行判断
-    if (ret == 0)
+    if (ret == OK)
     {
         // 接收成功
         // 将得到的http请求内容地址传递回去
         *content = request_content;
     }
-    else
-    {
-        // 对http响应代码进行赋值
-        http_response_mun = BAD_REQUEST;
-        // 表示接收http请求内容时出错了,作出相应的响应
-        if (-1 == http_response(web_socket, http_response_mun))
-        {
-            // 表示发送响应错误
-            printf("HTTP RESPONSE ERROR!\r\n");
-        }
-    }
-
     return ret;
 }
 
@@ -522,10 +509,10 @@ int client_connect(__socket_arg *net_arg_p)
 
     // 完成连接
     puts("connect...");
-    if (*net_arg_p->socket_point = connect(*(net_arg_p->socket_point), (sockaddr *)&web_addr, sizeof(web_addr)) == SOCKET_ERROR)
+    if (SOCKET_ERROR == connect(service_socket, (sockaddr *)&web_addr, sizeof(web_addr)))
     {
         return -1;
     }
-
+    *net_arg_p->socket_point = service_socket;
     return 0;
 }

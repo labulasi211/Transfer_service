@@ -8,12 +8,12 @@
 #定义CXX作为编译器
 CXX = g++
 #定义CXXFLAGES作为编译器优化选项参数
-CXXFLAGES = -O2
+CXXFLAGES := -g -O2
 
 #定义LINK作为连接器
 LINK = g++
 #定义LFLAGS作为连接器的优化选项参数
-LFLAGS = 
+LFLAGS := -g
 
 #定义安装命令变量
 INSTALL_FILE := install -m 755 -p
@@ -66,7 +66,8 @@ SUB_DIR := $(LIB_SOCKET_DIR)\
 #传递给子Makefile中的文件
 export CXX OBJ TOP_DIR OBJ_DIR BIN_DIR\
 		LIB_CALLBACK_DIR LIB_MESSAGE_QUEUE_DIR \
-		LIB_MULTITHREAD_DIR INCPATH
+		LIB_MULTITHREAD_DIR INCPATH\
+		CXXFLAGES
 
 #定义make伪目标
 .PHONY:clean cleanall all install

@@ -30,6 +30,6 @@ int android_callback_func(void* str,__data_arg arg)
  * */
 int web_callback_func(void*str, __data_arg arg)
 {
-    printf("%s\r\n\r\n",(char*)str);
+    printf("web callback:%s\r\n\r\n",(char*)str);
     return OK;
 }

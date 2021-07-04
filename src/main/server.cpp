@@ -23,8 +23,8 @@
 
 // 定义Android和Web端的url和IP地址,以及端口号
 const char *web_url = "";
-const char *web_ip = "";
-int web_port = 80;
+const char *web_ip = "192.168.10.1";
+int web_port = 7800;
 const char *android_url = "";
 const char *android_ip = "";
 int android_port = 80;
@@ -162,7 +162,7 @@ int main(void)
         exit(1);
     }
 
-    sleep(30);
+    sleep(300);
 
     // 反初始化线程
     if (-1 == cancel_service_thread())
