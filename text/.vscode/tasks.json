@@ -7,8 +7,6 @@
             "args": [
                 "-g",
                 "${file}",
-                "${fileDirname}/slist.cpp",
-                "${fileDirname}/download.cpp",
                 "-o",
                 "${fileDirname}/${fileBasenameNoExtension}",
                 "-lpthread",

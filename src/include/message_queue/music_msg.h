@@ -10,6 +10,11 @@
 #define MAX_INTRO_LEN (1024)
 #define MAX_SINGER_LEN MAX_TITLE_LEN
 
+// 定义关于消息队列的一些宏
+#define MSG_TYPE (1)
+#define MSG_TYPE_INVAILD (0)
+#define MSG_SIZE (sizeof(char*)+sizeof(int))
+
 // 声明歌曲信息结构体
 struct __MUSIC_INFO
 {
@@ -20,7 +25,7 @@ struct __MUSIC_INFO
 };
 
 // 声明消息队列消息结构体
-typedef struct _MUSIC_MSG
+typedef struct __MUSIC_MSG
 {
     long msg_type;
     int music_num;
