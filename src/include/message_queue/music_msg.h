@@ -9,6 +9,7 @@
 #define MAX_TITLE_LEN (128)
 #define MAX_INTRO_LEN (1024)
 #define MAX_SINGER_LEN MAX_TITLE_LEN
+#define MAX_FILE_PATH_LEN MAX_INTRO_LEN
 
 // 定义关于消息队列的一些宏
 #define MSG_TYPE (1)
@@ -22,6 +23,7 @@ struct __MUSIC_INFO
     char title[MAX_TITLE_LEN];
     char intro[MAX_INTRO_LEN];
     char singer[MAX_SINGER_LEN];
+    char file_path[MAX_FILE_PATH_LEN];
 };
 
 // 声明消息队列消息结构体

@@ -14,7 +14,7 @@
 #define SOCKET_ERROR (-1)
 
 // 一些缓存区大小的定义
-#define MAX_LISTEN_NUM (1)
+#define MAX_LISTEN_NUM (5)
 #define RECV_BUF_SIZE (100)
 #define SEND_BUF_SIZE (100)
 #define LONGEST_FILE_NAME (100)
