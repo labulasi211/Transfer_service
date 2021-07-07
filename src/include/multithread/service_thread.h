@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <socket/socket.h>
 #include <signal.h>
+#include<transfer_service/transfer_service.h>
 
 // 声明创建线程需要传递的变量参数
 typedef struct __DATA_ARG

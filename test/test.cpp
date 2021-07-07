@@ -1,16 +1,22 @@
-#include<stdio.h>
-#include<time.h>
+#include <string.h>
+#include <stdio.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 
+#define FIND_MUSIC "../music/%d_%s_%s.mp3\r\n"
 #define TIME_NOW (time(NULL))
-void test(char*);
 
 int main(void)
 {
-    time_t time1=TIME_NOW;
-    printf("%ld\r\n",time1);
+    const char *delim = "?";
+    char buffer[200] = {0};
+    char *p = NULL;
+    printf(FIND_MUSIC, 1,"1","1");
     return 0;
 }
-
 
 // const char* p;
 // p is a pointer to const char.

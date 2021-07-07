@@ -5,9 +5,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include<transfer_service/transfer_service.h>
 
 // 定义连接时对方的默认端口号
-#define CONNECT_PORT (80)
+#define CONNECT_PORT (7800)
 
 // 定义一些错误标识
 #define INVALID_SOCKET (-1)
@@ -52,6 +53,8 @@
 #define OK (200)
 #define BAD_REQUEST (400)
 #define METHOD_NOT_ALLOWED (405)
+#define REQUESR_ENTITY_TOO_LARGE (413)
+#define NOT_FOUND (404)
 
 
 // 通过散列的方式来得到相应的字符串

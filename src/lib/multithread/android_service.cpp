@@ -16,6 +16,45 @@
 #include <message_queue/music_msg.h>
 #include <socket/socket.h>
 
+// 定义一个android一次性可以传输的文件数目/10的值
+#define MAX_TRANSFER_MUSIC_NUM (10)
+
+// 定义一个用于android端的专门变量，用于多android端连接
+typedef struct ADNROID_TRANSFER_DATA
+{
+    // 定义当前android端接收到的的消息的音乐文件个数，主要用于传输
+    // 音乐总数
+    int total_music_num;
+    // 定义当前文件传输掉的字节数
+    int file_len;
+    // 当前传输的音乐文件所在的位置
+    int position;
+    // 音乐文件列表集合s
+    struct __MUSIC_INFO *music_total_list[MAX_TRANSFER_MUSIC_NUM];
+} android_transfer_data;
+
+// 定义一个用于android端网络需要使用到的所有参数
+typedef struct ANDROID_TOTAL_DATA
+{
+    // 该android端的套接字
+    int android_socket;
+    // 该android端的网络状态
+    int android_state;
+    // 该android的周期
+    time_t time_start;
+    // 该andoird端需要传输的数据
+    android_transfer_data transfer_data;
+} android_total_data;
+
+struct ANDROID_ANDMIN
+{
+    // 定义最大连接数变量
+    int max_connect_num;
+    int connected_num;
+    // 定义一个管理android端的一个指针
+    android_total_data *android_list;
+};
+
 // 定义android端的几个状态
 enum ANDROID_STATE
 {
@@ -39,9 +78,6 @@ enum CHANGE_ANDROID_STATE
 // 定义超时计数值
 #define TIMEOUT_COUNT (60)
 #define TIME_NOW (time(NULL))
-// 定义一个专门的判断宏
-#define SUCCESSFUL (0)
-#define ERROR_APPEAR (-1)
 // 定义select超时时间
 #define ACCEPT_TIMEOUT (1)
 #define RECV_UTIMEOUT (100)
@@ -49,8 +85,8 @@ enum CHANGE_ANDROID_STATE
 // 定义应答协议中的状态字符串长度
 #define RESPONSE_LEN (2)
 // 定义应答协议中的状态字符串
-const char const RESPONSE_TYPE_OK_CODE[RESPONSE_LEN] = {0X04, 0X01};
-const char const RESPONSE_TYPE_TRANSfER_CODE[RESPONSE_LEN] = {0X04, 0X02};
+const char RESPONSE_TYPE_OK_CODE[RESPONSE_LEN] = {0X04, 0X01};
+const char RESPONSE_TYPE_TRANSfER_CODE[RESPONSE_LEN] = {0X04, 0X02};
 
 // 接收消息函数
 int recv_msg(int msg_id, __music_msg *music_msg);
@@ -66,17 +102,28 @@ int service_connect(const int location_socket, int *android_socket);
 int service_disconnect(int disconnect_socket);
 // 接收安卓端状态数据
 int recv_response(int android_socket, char *recv_buffer);
-// 传输音乐文件*
+// 传输音乐文件
 int transfer_music(__music_msg music_msg, int recv_socket);
 // 删除消息内容
 int msg_delete(__music_msg *music_msg);
 // 对接收到的消息进行响应
 int response_android(int *state, char *recv_buffer);
 // 发送响应
-int send_response(const char *send_buffer, int len);
+int send_response(int recv_socket, const char *send_buffer, int len);
 // 设置socket为非阻塞状态
 int set_socket_nonblock(int set_socket);
 
+/** 传输数据
+ * @brief 对数据进行传输
+ * @param[in] send_buffer 指向发送缓存区，用于发送
+ * @param[in] len 发送数据的长度
+ * @param[out] int 返回传输状态
+ * */
+int send_response(int recv_socket, const char *send_buffer, int len)
+{
+    // 通过send函数进行发送
+    return send(recv_socket, send_buffer, len, 0) > 0 ? SUCCESSFUL : ERROR_APPEAR;
+}
 /** 文件传输函数
  * @brief 通过对消息的判断，实现一定量的文件传输，只传送一定量
  * @param[in] music_arg 指向消息结构体的指针，主要用于储存传递过来的消息
@@ -94,7 +141,7 @@ int transfer_music(__music_msg music_msg, int recv_socket)
     // 定义当前传输的文件的位置
     static long int file_len = 0;
     // 定义文件描述符
-    static int fp = NULL;
+    static int fp = 0;
 
     // 定义发送缓存区
     char send_buffer[SEND_BUF_SIZE] = {0};
@@ -114,7 +161,7 @@ int transfer_music(__music_msg music_msg, int recv_socket)
         }
         memcpy(music_info_list, music_msg.music_info_list, sizeof(struct __MUSIC_INFO) * music_msg.music_num);
         file_len = 0;
-        fp = NULL;
+        fp = 0;
         music_num = music_msg.music_num;
     }
 
@@ -124,11 +171,12 @@ int transfer_music(__music_msg music_msg, int recv_socket)
         // 对文件的读取
         fp = fp ? fp : open(music_info_list[position].file_path, O_RDONLY);
         // 读取文件
-        if (0 >= read(fp, send_buffer, SEND_BUF_SIZE))
+        file_len = read(fp, send_buffer, SEND_BUF_SIZE);
+        if (file_len <= 0)
         {
             // 表示当前文件已经全部读取或者读取失败
             // 跳转到下一个文件
-            fp = NULL;
+            fp = 0;
             position++;
             // 判断当前是否已经传输完成
             if (position == music_num)
@@ -141,7 +189,7 @@ int transfer_music(__music_msg music_msg, int recv_socket)
         // 将读取到的数据发送出去
         else
         {
-            if (0 >send(recv_socket, send_buffer, SEND_BUF_SIZE, 0))
+            if (ERROR_APPEAR == send_response(recv_socket, send_buffer, file_len))
             {
                 // 表示发送错误
                 return ERROR_APPEAR;
@@ -163,19 +211,26 @@ int transfer_music(__music_msg music_msg, int recv_socket)
  * */
 int response_android(int *state, char *recv_buffer)
 {
+    // 表示响应返回值
+    int res = SUCCESSFUL;
     // 对接收消息的第一位进行判断
     switch (recv_buffer[0])
     {
+    case 0x00:
+        // 表示没有消息发过来的
+        break;
     case 0x01:
         // 上下线
         if (recv_buffer[1] == 0x01)
         {
             // 表示上线
+            printf("ONLINE.\r\n");
             *state UP TO_ONLINE;
         }
         else if (recv_buffer[1] == 0x00)
         {
             // 表示下线
+            printf("OFFLINE.\r\n");
             *state DOWN TO_OFFLINE;
         }
         break;
@@ -189,12 +244,14 @@ int response_android(int *state, char *recv_buffer)
         {
             // 表示当前需要停止发送
             // 将当前状态重新赋值为在线
+            printf("TRANSFER START.\r\n");
             *state DOWN TO_ONLINE;
         }
         // 判断当前响应类型是否是准备好啦并且当前该设备也在线
         else if (recv_buffer[1] == 0x01)
         {
             // 表示可以向android端发送数据
+            printf("TRANSFER OFF.\r\n");
             *state UP TO_RECVING;
             if (*state == ANDROID_UNDEFINED)
             {
@@ -205,10 +262,11 @@ int response_android(int *state, char *recv_buffer)
         break;
     default:
         // 表示接收到了无法识别的消息
-        return ERROR_APPEAR;
+        res = ERROR_APPEAR;
     }
     // 表示响应成功
-    return SUCCESSFUL;
+    recv_buffer[0] = 0;
+    return res;
 }
 
 /** 接收响应函数
@@ -221,7 +279,7 @@ int recv_response(int android_socket, char *recv_buffer)
 {
     // 同样的通过select实现一定时间阻塞的接收
     // 判断套接字是否为空
-    if (android_socket == NULL)
+    if (android_socket == 0)
     {
         // 如果为空
         printf("SOCKET RECV ERROR.\r\n");
@@ -276,7 +334,7 @@ int recv_response(int android_socket, char *recv_buffer)
         }
     }
     // 表示发生了一些出乎意料的错误
-    printf("RECV RESSPONSE ERROR.\r\n");
+    printf("RECV RESPONSE ERROR.\r\n");
     return ERROR_APPEAR;
 }
 
@@ -429,8 +487,8 @@ int service_init(__socket_arg net_arg)
     sockaddr_in location_addr;
 
     // 初始化网络变量
-    strcpy(location_net_arg.url, "lacalhost");
-    strcpy(location_net_arg.ip, "");
+    strcpy(location_net_arg.url, "");
+    strcpy(location_net_arg.ip, "0.0.0.0");
     location_net_arg.remote_port = 0;
     location_net_arg.using_port = CONNECT_PORT;
 
@@ -555,7 +613,7 @@ void *android_service(void *arg)
                 // 判断是否接收到消息
                 if (ERROR_APPEAR == msg_empty(music_msg))
                     // 表示现在有消息过来,需要向android端传输数据
-                    if (ERROR_APPEAR == send_response(RESPONSE_TYPE_TRANSfER_CODE, RESPONSE_LEN))
+                    if (ERROR_APPEAR == send_response(android_socket, RESPONSE_TYPE_TRANSfER_CODE, RESPONSE_LEN))
                     {
                         // 发送失败
                         printf("SEND RESPONSE FAIL.\r\n");

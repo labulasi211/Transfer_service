@@ -23,6 +23,8 @@ int http_response_status_string_init(void)
     strcpy(RESPONSE_STATUS_CODE[GET_HTTP_RESPONSE_STRING(OK)], "OK");
     strcpy(RESPONSE_STATUS_CODE[GET_HTTP_RESPONSE_STRING(BAD_REQUEST)], "Bad Request");
     strcpy(RESPONSE_STATUS_CODE[GET_HTTP_RESPONSE_STRING(METHOD_NOT_ALLOWED)], "Method Not Allowed");
+    strcpy(RESPONSE_STATUS_CODE[GET_HTTP_RESPONSE_STRING(REQUESR_ENTITY_TOO_LARGE)], "Request Entity Too Large");
+    strcpy(RESPONSE_STATUS_CODE[GET_HTTP_RESPONSE_STRING(NOT_FOUND)], "Not Found");
     return 0;
 }
 /** 对http请求进行响应
@@ -385,6 +387,12 @@ int get_ip_addr(char *domain, char *ip_addr)
  * */
 int parse_url(sockaddr_in *addr_p, char *url)
 {
+    // 先判断当前url是否是有值的
+    if(0==strlen(url))
+    {
+        // 直接返回ERROR
+        return ERROR_APPEAR;
+    }
     // 通过url解析出域名和端口号,只对这两个进行解析
     // 定义返回状态值
     int ret = -1;
