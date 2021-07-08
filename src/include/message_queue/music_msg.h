@@ -48,5 +48,7 @@ typedef struct __MUSIC_MSG
 int init_msg(key_t key);
 // 反初始化消息队列
 int deinit_msg(key_t key);
+// 消息结构初始化函数
+int msg_init(__music_msg *music_arg);
 
 #endif

@@ -15,24 +15,6 @@
 #include <message_queue/music_msg.h>
 #include <socket/socket.h>
 
-// 消息结构初始化函数
-int msg_init(__music_msg *music_arg);
-
-/** 初始化消息结构体函数
- * @brief 初始化消息结构体
- * @param[in] music_msg 需要初始化的消息结构体指针
- * @param[out] int 返回初始化状态
- * */
-int msg_init(__music_msg *music_arg)
-{
-    // 初始化消息结构体
-    music_arg->msg_type = MSG_TYPE;
-    music_arg->music_num = 0;
-    music_arg->music_info_list = NULL;
-    music_arg->device_id = 0;
-    strcpy(music_arg->device_name, "");
-    return SUCCESSFUL;
-}
 
 /** android回调函数
  * @brief 测试
@@ -90,7 +72,7 @@ int web_callback_func(void *str, __data_arg arg)
             // 解析出需要的参数
             sscanf(pos,
                    "id=%d&name=%s&title=%s&%*s&updateTime=%*s&deviceID=%ld&deviceName=%s",
-                   music_info.id, music_info.singer, music_info.title, &device_id, device_name);
+                   &music_info.id, music_info.singer, music_info.title, &device_id, device_name);
             // 获得文件地址
             sprintf(music_info.file_path, FIND_MUSIC, music_info.id, music_info.title, music_info.singer);
             // 判断该文件是否存在
