@@ -146,7 +146,7 @@ void *transfer_data(void *arg)
     // 当期所传输文件数量
     int music_count = 1;
     // 定义文件表示符
-    int fp=0;
+    int fp = 0;
     // 定义当前文件传输掉的字节数
     int file_len = 0;
     // 当前传输的音乐文件所在的位置
@@ -201,6 +201,8 @@ void *transfer_data(void *arg)
             }
         }
     }
+    // 删除传输队列
+    transfer_data_delete(&android_arg->transfer_data);
     // 结束线程
     pthread_exit(0);
 }
@@ -414,7 +416,7 @@ int response_android(android_total_data *android_arg, char *recv_buffer)
         else if (recv_buffer[1] == 0x00)
         {
             // 表示下线
-            printf("%d:OFFLINE.\r\n",android_arg->android_socket);
+            printf("%d:OFFLINE.\r\n", android_arg->android_socket);
             android_arg->android_state DOWN TO_OFFLINE;
         }
         break;
@@ -471,12 +473,12 @@ void *recv_response(void *android)
     // 定义接收缓存区
     char recv_buffer[RECV_BUF_SIZE] = {0};
 
-    // 超时时间的设置
-    timeout.tv_usec = 0;
-    timeout.tv_sec = RECV_TIMEOUT;
     // 主循环体
     while (1)
     {
+        // 超时时间的设置
+        timeout.tv_usec = 0;
+        timeout.tv_sec = RECV_TIMEOUT;
         // 同样的通过select实现一定时间阻塞的接收
         // 判断套接字是否为空
         if (android_arg.connected_num == 0)
@@ -669,13 +671,14 @@ void *service_connect(void *android)
     int res;
 
     // 对select中需要使用到的函数进行初始化
-    FD_ZERO(&readfds);
     maxfd = location_socket;
-    FD_SET(location_socket, &readfds);
-    timeout.tv_sec = ACCEPT_TIMEOUT;
-    timeout.tv_usec = 0;
     while (1)
     {
+        // 每次需要重新赋值
+        timeout.tv_sec = ACCEPT_TIMEOUT;
+        timeout.tv_usec = 0;
+        FD_ZERO(&readfds);
+        FD_SET(location_socket, &readfds);
         // 判断是否已经到达最大连接数
         if (android_arg->connected_num == android_arg->max_connect_num)
         {
@@ -835,8 +838,6 @@ void *android_service(void *arg)
 {
     // 对参数中的数据进行格式化
     __service_thread_arg thread_arg = *(__service_thread_arg *)arg;
-    // 定义消息结构体
-    __music_msg music_msg;
     // 定义消息ID
     int msg_id = thread_arg.database.msg_id;
     // 定义网络变量
@@ -847,23 +848,24 @@ void *android_service(void *arg)
     pthread_t connect_thread_id;
     pthread_t recv_thread_id;
 
-    // 初始化消息结构体
-    music_msg.msg_type = MSG_TYPE_INVAILD;
-    music_msg.music_num = 0;
-    music_msg.music_info_list = NULL;
-
     // 本地服务器套接字初始化
     if (ERROR_APPEAR == service_init(socket_arg))
     {
         // 初始化本地套接字失败
         // 之后的操作都没办法实现
+        printf("SERVICE INIT ERROR.\r\n");
         exit(1);
     }
 
     // 将本地socket赋值给全局变量
     location_socket = *socket_arg.socket_point;
 
-    // 初始化两个线程
+    // 初始化android管理变量
+    if (ERROR_APPEAR == android_init(&android, MAX_CONNECTED_NUM))
+    {
+        // 初始化失败
+        printf("ANDROID INIT ERROR.\r\n");
+    }
     // 一个是连接线程，一个是接收响应线程
     if (SUCCESSFUL != pthread_create(&connect_thread_id, NULL, service_connect, (void *)&android))
     {
@@ -871,6 +873,7 @@ void *android_service(void *arg)
         printf("CREAT THREAD ERROR.");
         exit(1);
     }
+    // 初始化两个线程
     if (SUCCESSFUL != pthread_create(&recv_thread_id, NULL, recv_response, (void *)&android))
     {
         // 表示创建出错

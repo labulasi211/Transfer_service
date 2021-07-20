@@ -8,7 +8,7 @@
 #定义CXX作为编译器
 CXX = g++
 #定义CXXFLAGES作为编译器优化选项参数
-CXXFLAGES := -g -O2
+CXXFLAGES := -g -O0
 
 #定义LINK作为连接器
 LINK = g++
